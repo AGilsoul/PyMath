@@ -26,6 +26,59 @@ class PyMath:
         return new_coefs, new_powers
 
     @staticmethod
+    def multiply_poly(coefs_1, powers_1, coefs_2, powers_2):
+        new_coefs = []
+        new_powers = []
+        for c1 in range(len(coefs_1)):
+            for c2 in range(len(coefs_2)):
+                new_coefs.append(coefs_1[c1] * coefs_2[c2])
+                new_powers.append(powers_1[c1] + powers_2[c2])
+
+        simp_coefs = []
+        simp_powers = []
+        excluded_indices = []
+        changes = -1
+        while changes != 0:
+            changes = 1
+            simp_coefs = []
+            simp_powers = []
+
+            excluded_indices = []
+            for p1 in range(len(new_powers)):
+                if p1 not in excluded_indices:
+                    duplicate_coefs = [new_coefs[p1]]
+                    for p2 in range(p1 + 1, len(new_powers)):
+                        if new_powers[p1] == new_powers[p2]:
+                            excluded_indices.append(p2)
+                            duplicate_coefs.append(new_coefs[p2])
+                            changes += 1
+
+                    simp_powers.append(new_powers[p1])
+                    simp_coefs.append(sum(duplicate_coefs))
+
+            new_powers = simp_powers
+            new_coefs = simp_coefs
+            changes -= 1
+
+        return simp_coefs, simp_powers
+
+    @staticmethod
+    def poly_to_string(coefs, powers):
+        result = ""
+        for x in range(len(coefs)):
+            if powers[x] != 0:
+                if x != len(coefs) - 1:
+                    result += str(coefs[x]) + "x^" + str(powers[x]) + " "
+                else:
+                    result += str(coefs[x]) + "x^" + str(powers[x])
+            else:
+                if x != len(coefs) - 1:
+                    result += str(coefs[x]) + " "
+                else:
+                    result += str(coefs[x])
+        return result
+
+    @staticmethod
     def poly_zeros(coefs, powers):
         num_zeros = max(powers)
         known_zeros = []
@@ -196,6 +249,33 @@ class PyMath:
             trace += matrix[i][i]
         return trace
 
+    @staticmethod
+    def matrix_characteristic(matrix):
+        poly_rows = np.empty([len(matrix), len(matrix)], list)
+
+        for x in range(len(poly_rows)):
+            for y in range(len(poly_rows[x])):
+               poly_rows[x][y] = [[], []]
+
+        for x in range(len(matrix)):
+            for y in range(len(matrix[x])):
+                if x == y:
+                    poly_rows[x][y] = [[matrix[x][y], -1], [0, 1]]
+                else:
+                    poly_rows[x][y] = [[matrix[x][y]], [0]]
+
+        print("[")
+        for x in range(len(poly_rows)):
+            print("[")
+            for y in range(len(poly_rows[x])):
+                if y != len(poly_rows[x]) - 1:
+                    print(PyMath.poly_to_string(poly_rows[x][y][0], poly_rows[x][y][1]) + ", ")
+                else:
+                    print(PyMath.poly_to_string(poly_rows[x][y][0], poly_rows[x][y][1]))
+            print("]")
+        print("]")
+
+
 
 matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-print(PyMath.matrix_trace(matrix))
+PyMath.matrix_characteristic(matrix)
