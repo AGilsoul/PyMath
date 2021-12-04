@@ -1,5 +1,4 @@
 import numpy as np
-import math
 
 
 class PyMath:
@@ -121,24 +120,34 @@ class PyMath:
         for x in range(len(coefs)):
             if powers[x] != 0 and powers[x] != 1:
                 if x != len(coefs) - 1:
-                    result += str(coefs[x]) + "x^" + str(powers[x]) + " + "
+                    result += str(coefs[x]) + "λ^" + str(powers[x]) + " + "
                 else:
-                    result += str(coefs[x]) + "x^" + str(powers[x])
+                    result += str(coefs[x]) + "λ^" + str(powers[x])
             elif powers[x] == 1:
                 if x != len(coefs) - 1:
-                    result += str(coefs[x]) + "x" + " + "
+                    result += str(coefs[x]) + "λ" + " + "
                 else:
-                    result += str(coefs[x]) + "x"
+                    result += str(coefs[x]) + "λ"
             else:
                 result += str(coefs[x])
         return result
 
     @staticmethod
     def poly_zeros(coefs, powers):
-        num_zeros = max(powers)
-        ranges = PyMath.intermediate_value(coefs, powers, num_zeros)
+        ranges = PyMath.intermediate_value(coefs, powers, max(powers))
         results = PyMath.newton_method(coefs, powers, ranges)
-        return results
+        temp_results = []
+        for r in results:
+            test_coefs = coefs
+            test_powers = powers
+            iterating = True
+            while iterating:
+                if abs(0 - PyMath.calc_polynomial(test_coefs, test_powers, r)) < 2:
+                    temp_results.append(r)
+                    test_coefs, test_powers = PyMath.poly_derivative(test_coefs, test_powers)
+                else:
+                    iterating = False
+        return np.array(temp_results)
 
     @staticmethod
     def intermediate_value(coefs, powers, num_zeros):
@@ -156,19 +165,16 @@ class PyMath:
     def __intermediate_value_recursive(coefs, powers, num_zeros, cur_ranges, iterations):
         new_ranges = []
         for r in cur_ranges:
-            temp_range1 = [r[0], r[1] - (r[1] - r[0]) / 2]
-            temp_range2 = [r[1] - ((r[1] - r[0]) / 2), r[1]]
-            new_ranges.append(temp_range1)
-            new_ranges.append(temp_range2)
-
+            new_ranges.append([r[0], r[1] - (r[1] - r[0]) / 2])
+            new_ranges.append([r[1] - ((r[1] - r[0]) / 2), r[1]])
         test_ranges = []
         for r in new_ranges:
-            results = PyMath.calc_polynomial(coefs, powers, r[0]), PyMath.calc_polynomial(coefs, powers, r[1])
-            if results[0] * results[1] <= 0:
+            if PyMath.calc_polynomial(coefs, powers, r[0]) * PyMath.calc_polynomial(coefs, powers, r[1]) <= 0:
                 test_ranges.append(r)
-        if len(test_ranges) == num_zeros or len(new_ranges) >= 8000:
+        if len(test_ranges) >= num_zeros or iterations > num_zeros * 2:
             return test_ranges
 
+        iterations += 1
         return PyMath.__intermediate_value_recursive(coefs, powers, num_zeros, new_ranges, iterations)
 
     @staticmethod
@@ -176,33 +182,17 @@ class PyMath:
         zeros = []
         for i in starting_points:
             real_val = PyMath.__newton_method_recursive(coefs, powers, i, 0)
-            if real_val is not None:
+            if real_val is not None and abs(0 - PyMath.calc_polynomial(coefs, powers, real_val)) < 0.01:
                 zeros.append(round(real_val, 5))
-            complex_val1 = PyMath.__newton_method_recursive(coefs, powers, complex(i, i), 0)
-            complex_val2 = PyMath.__newton_method_recursive(coefs, powers, complex(i, 1), 0)
-            complex_val3 = PyMath.__newton_method_recursive(coefs, powers, complex(1, i), 0)
-            if complex_val1 is not None:
-                zeros.append(complex_val1)
-            if complex_val2 is not None:
-                zeros.append(complex_val2)
-            if complex_val3 is not None:
-                zeros.append(complex_val3)
 
         result = np.unique(np.array(zeros))
-        th = 0.001
+        th = 0.1
         result = np.delete(result, np.argwhere(np.ediff1d(result) <= th) + 1)
-        temp_result = [x for x in result]
-        for i in temp_result:
-            if np.iscomplex(i):
-                if np.imag != 0:
-                    if np.conj(i) not in temp_result:
-                        temp_result.append(np.conj(i))
-        result = temp_result
-        return np.array(result)
+        return result
 
     @staticmethod
     def __newton_method_recursive(coefs, powers, starting_point, estimate_count):
-        if estimate_count >= 900:
+        if estimate_count >= 990:
             return starting_point
 
         deriv_coef, deriv_powers = PyMath.poly_derivative(coefs, powers)
@@ -317,19 +307,9 @@ class PyMath:
     @staticmethod
     def __poly_matrix_determinant_recursive(matrix):
         if len(matrix) == 2:
-            c1 = matrix[0][0][0]
-            p1 = matrix[0][0][1]
-            c2 = matrix[1][1][0]
-            p2 = matrix[1][1][1]
-
-            c3 = matrix[0][1][0]
-            p3 = matrix[0][1][1]
-            c4 = matrix[1][0][0]
-            p4 = matrix[1][0][1]
-            m_coefs1, m_powers1 = PyMath.multiply_poly(c1, p1, c2, p2)
-            m_coefs2, m_powers2 = PyMath.multiply_poly(c3, p3, c4, p4)
-            resultc, resultp = PyMath.poly_subtract(m_coefs1, m_powers1, m_coefs2, m_powers2)
-            return resultc, resultp
+            coefs1, powers1 = PyMath.multiply_poly(matrix[0][0][0], matrix[0][0][1], matrix[1][1][0], matrix[1][1][1])
+            coefs2, powers2 = PyMath.multiply_poly(matrix[0][1][0], matrix[0][1][1], matrix[1][0][0], matrix[1][0][1])
+            return PyMath.poly_subtract(coefs1, powers1, coefs2, powers2)
 
         new_totalc = [0]
         new_totalp = [0]
@@ -338,12 +318,10 @@ class PyMath:
             new_matrix = []
             if i == 0:
                 for row in range(len(matrix) - 1):
-                    new_row = [matrix[row + 1][x + 1] for x in range(len(matrix) - 1)]
-                    new_matrix.append(new_row)
+                    new_matrix.append([matrix[row + 1][x + 1] for x in range(len(matrix) - 1)])
             elif i == len(matrix[0]) - 1:
                 for row in range(len(matrix) - 1):
-                    new_row = [matrix[row + 1][x] for x in range(len(matrix) - 1)]
-                    new_matrix.append(new_row)
+                    new_matrix.append([matrix[row + 1][x] for x in range(len(matrix) - 1)])
             else:
                 for row in range(len(matrix) - 1):
                     new_row = []
@@ -351,13 +329,12 @@ class PyMath:
                         if column != i:
                             new_row.append(matrix[row + 1][column])
                     new_matrix.append(new_row)
-            # print(PyMath.matrix_to_string(new_matrix))
+
             new_matrix = np.array(new_matrix, dtype=object)
-            sub_detc, sub_detp = PyMath.__poly_matrix_determinant_recursive(new_matrix)
-            mult_detc, mult_detp = PyMath.multiply_poly(matrix[0][i][0], matrix[0][i][1], sub_detc, sub_detp)
+            mult_detc, mult_detp = PyMath.__poly_matrix_determinant_recursive(new_matrix)
+            mult_detc, mult_detp = PyMath.multiply_poly(matrix[0][i][0], matrix[0][i][1], mult_detc, mult_detp)
             mult_detc, mult_detp = PyMath.multiply_poly([sign], [0], mult_detc, mult_detp)
             new_totalc, new_totalp = PyMath.poly_add(new_totalc, new_totalp, mult_detc, mult_detp)
-            # new_total += sign * matrix[0][i] * PyMath.__matrix_determinant_recursive(new_matrix, sign)
             sign *= -1
         return new_totalc, new_totalp
 
@@ -371,10 +348,9 @@ class PyMath:
     @staticmethod
     def matrix_characteristic(matrix):
         poly_rows = np.empty([len(matrix), len(matrix)], list)
-
-        for x in range(len(poly_rows)):
-            for y in range(len(poly_rows[x])):
-               poly_rows[x][y] = [[], []]
+        #for x in range(len(poly_rows)):
+            #for y in range(len(poly_rows[x])):
+                #poly_rows[x][y] = [[], []]
 
         for x in range(len(matrix)):
             for y in range(len(matrix[x])):
@@ -383,12 +359,14 @@ class PyMath:
                 else:
                     poly_rows[x][y] = [[matrix[x][y]], [0]]
 
+        print("finding determinant")
         determc, determp = PyMath.poly_matrix_determinant(poly_rows)
         return determc, determp
 
     @staticmethod
     def matrix_eigen_value(matrix):
         char_c, char_p = PyMath.matrix_characteristic(matrix)
+        print(PyMath.poly_to_string(char_c, char_p))
         return PyMath.poly_zeros(char_c, char_p)
 
     @staticmethod
@@ -413,10 +391,47 @@ class PyMath:
             result += PyMath.poly_to_string(temp_pos[0], temp_pos[1]) + "]\n"
         return result
 
+    @staticmethod
+    def adjacency_matrix(vertices, edges):
+        new_adjacency = np.zeros([len(vertices), len(vertices)], int)
+        for edge in edges:
+            new_adjacency[edge[0], edge[1]] = 1
+            new_adjacency[edge[1], edge[0]] = 1
+        return new_adjacency
 
-matrix = [[1, 4, 4, 6, 6, 8], [5, 3, 7, 3, 7, 3], [1, 3, 9, 0, 4, 5], [0, 2, 6, 9, 5, 9], [3, 0, 7, 8, 2, 4], [6, 6, 9, 2, 8, 7]]
-print("Eigenvalues of matrix: ")
-print(PyMath.matrix_to_string(matrix))
+    @staticmethod
+    def degree_matrix(matrix):
+        new_degree = np.zeros([len(matrix), len(matrix)], int)
+        for i in range(len(matrix)):
+            new_degree[i][i] = sum(matrix[i])
+        return new_degree
+
+    @staticmethod
+    def graph_laplacian(ad_matrix, deg_matrix):
+        ad_matrix = PyMath.matrix_scalar(-1, ad_matrix)
+        graph_l = PyMath.add_matrices(deg_matrix, ad_matrix)
+        return graph_l
+
+
+# matrix = [[1, 4, 4, 6, 6, 8], [5, 3, 7, 3, 7, 3], [1, 3, 9, 0, 4, 5], [0, 2, 6, 9, 5, 9], [3, 0, 7, 8, 2, 4], [6, 6, 9, 2, 8, 7]]
+# print("Eigenvalues of matrix: ")
+# print(PyMath.matrix_to_string(matrix))
+# print()
+# print(PyMath.matrix_eigen_value(matrix))
+
+vertices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+edges = [[5, 3], [4, 3], [4, 5], [5, 6], [5, 7], [6, 7],
+         [2, 1], [2, 0], [1, 0], [0, 9], [9, 8], [0, 8], [5, 0]
+         ]
+adjacency = PyMath.adjacency_matrix(vertices, edges)
+print(adjacency)
 print()
-print(PyMath.matrix_eigen_value(matrix))
-
+degree = PyMath.degree_matrix(adjacency)
+print(degree)
+print()
+graph_lap = PyMath.graph_laplacian(adjacency, degree)
+print(graph_lap)
+print()
+eigen_graph = PyMath.matrix_eigen_value(graph_lap)
+print(eigen_graph)
+print()
